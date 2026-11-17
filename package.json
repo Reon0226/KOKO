@@ -1,0 +1,14 @@
+{
+  "name": "koko",
+  "version": "0.2.0",
+  "private": true,
+  "description": "KOKO — きみの字で、話そう。手書きのまま届く1対1メッセージアプリ（Web MVP）",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node --no-warnings server/server.js",
+    "test": "node --no-warnings --test tests/api.test.js tests/guides.test.mjs",
+    "e2e": "node --no-warnings tests/e2e.cjs",
+    "metrics": "node --no-warnings scripts/metrics.js",
+    "icons": "python3 scripts/make_icon.py && node scripts/export_icons.cjs"
+  }
+}

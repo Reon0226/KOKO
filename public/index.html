@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#87D9ED">
+<meta name="description" content="きみの字で、話そう。手書きのまま届くメッセージアプリ KOKO">
+<title>KOKO — きみの字で、話そう。</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- はじめて -->
+  <section class="screen" id="s-welcome" hidden>
+    <div class="welcome">
+      <img class="hero-icon" src="icons/icon.svg" alt="水色のハートにKOKOの文字のアイコン" width="120" height="120">
+      <h1 class="logo">KOKO</h1>
+      <p class="copy">きみの字で、話そう。</p>
+      <div class="invite-banner" id="w-invite" hidden></div>
+      <form id="f-register" class="card form" autocomplete="off">
+        <label for="r-name">相手に表示される名前</label>
+        <input id="r-name" name="name" maxlength="20" required placeholder="例：あおい" enterkeyhint="go">
+        <button class="primary wide" type="submit">はじめる</button>
+        <p class="fine">連絡先は読み取りません。友達を誘うのは、あなたが招待リンクを送ったときだけです。</p>
+      </form>
+      <button class="link" id="to-login" type="button">引き継ぎコードでログイン</button>
+      <form id="f-login" class="card form" hidden autocomplete="off">
+        <label for="l-code">引き継ぎコード</label>
+        <input id="l-code" name="code" placeholder="XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" spellcheck="false" required>
+        <button class="primary wide" type="submit">ログイン</button>
+        <button class="link" id="to-register" type="button">新しくはじめる</button>
+      </form>
+      <p class="err" id="w-err" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- 引き継ぎコードの表示 -->
+  <section class="screen" id="s-code" hidden>
+    <div class="welcome">
+      <h2>引き継ぎコード</h2>
+      <p class="fine">ログアウトした後や別の端末でログインするときに使います。この画面でしか表示されません。他の人には見せないでください。</p>
+      <div class="codebox" id="code-text"></div>
+      <div class="row"><button id="code-copy" type="button">コピー</button><button class="primary" id="code-done" type="button">保存した</button></div>
+      <p class="fine">メールや電話番号のアカウントは、この試作ではまだありません。</p>
+    </div>
+  </section>
+
+  <!-- トーク一覧 -->
+  <section class="screen" id="s-home" hidden>
+    <header class="bar">
+      <img src="icons/icon.svg" alt="" width="36" height="36">
+      <div class="title"><b>KOKO</b><small id="h-me"></small></div>
+      <button class="icon" id="to-settings" type="button" aria-label="設定">⚙︎</button>
+    </header>
+    <div class="conn" id="h-conn" role="status" aria-live="polite"></div>
+    <main class="list" id="conv-list" aria-label="トーク"></main>
+    <div class="homefoot"><button class="primary wide" id="make-invite" type="button">＋ 友達を招待する</button></div>
+  </section>
+
+  <!-- トーク -->
+  <section class="screen" id="s-chat" hidden>
+    <header class="bar">
+      <button class="icon" id="back" type="button" aria-label="トーク一覧へ戻る">‹</button>
+      <div class="title"><b id="c-name"></b><small id="c-conn" role="status" aria-live="polite"></small></div>
+      <button class="icon" id="c-menu" type="button" aria-label="このトークのメニュー">⋯</button>
+    </header>
+    <main class="chat" id="chat" aria-label="メッセージ" aria-live="polite"></main>
+    <section id="composer" aria-label="手書き入力"></section>
+  </section>
+
+  <!-- 設定 -->
+  <section class="screen" id="s-settings" hidden>
+    <header class="bar">
+      <button class="icon" id="settings-back" type="button" aria-label="戻る">‹</button>
+      <div class="title"><b>設定</b></div>
+    </header>
+    <main class="settings">
+      <h3>プロフィール</h3>
+      <div class="card"><label for="st-name">名前</label><div class="row"><input id="st-name" maxlength="20"><button id="st-name-save" type="button">保存</button></div></div>
+
+      <h3>書き方</h3>
+      <div class="card">
+        <div class="field"><span>マスの数</span><div class="seg" id="st-cells" role="radiogroup" aria-label="マスの数"></div></div>
+        <div class="field"><span>ボタンの配置</span><div class="seg" id="st-hand" role="radiogroup" aria-label="利き手"></div></div>
+        <div class="field col"><span>お手本の見せ方 <small>（試作中・比べています）</small></span><div class="seg" id="st-guide" role="radiogroup" aria-label="お手本の見せ方"></div></div>
+        <div class="field col"><span>読み取り補助</span><label class="check"><input type="checkbox" id="st-recog"> 書いた字を端末内で読み取り、お手本候補を出す</label><small id="st-recog-status"></small></div>
+      </div>
+
+      <h3>通知</h3>
+      <div class="card">
+        <label class="check"><input type="checkbox" id="st-notify"> 新しいメッセージを知らせる</label>
+        <small>いまは KOKO を開いている間（別のタブにいるときなど）だけ通知します。アプリを閉じているときのプッシュ通知はまだありません。通知には本文を出しません。</small>
+      </div>
+
+      <h3>アカウントと端末</h3>
+      <div class="card stack">
+        <button id="st-code" type="button">引き継ぎコードを作り直す</button>
+        <button id="st-logout" type="button">この端末からログアウト</button>
+        <button id="st-logout-all" type="button">すべての端末からログアウト</button>
+        <button id="st-delete" class="danger" type="button">アカウントを削除</button>
+        <small>ログアウトすると、この端末に残っている下書き・送信待ち・設定も消します。</small>
+      </div>
+
+      <h3>データの扱い</h3>
+      <div class="card prose">
+        <p>手書きの線（座標・書いた速さ・ペンの筆圧）と、任意の読み上げ用テキストをサーバーに保存し、トークの相手だけに届けます。</p>
+        <p>エンドツーエンド暗号化（E2EE）には<strong>まだ対応していません</strong>。サーバーの運用者は技術的に内容を見られます。通信の暗号化は HTTPS で公開したときに有効になります。</p>
+        <p>読み取り補助の結果、お手本、マスの線は送信しません。アカウントを削除すると、あなたが送った筆跡はサーバーから消えます。</p>
+        <p class="fine" id="st-build"></p>
+      </div>
+    </main>
+  </section>
+
+  <dialog id="sheet" class="sheet"><form method="dialog" id="sheet-form"></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+<noscript>KOKO を使うには JavaScript を有効にしてください。</noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

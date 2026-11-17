@@ -1,0 +1,160 @@
+rules_version = '2';
+// KOKO（Spark・サーバー無し版）のセキュリティルール。
+// サーバーが無いので、「誰が・何を・どこまで書けるか」はこのルールだけで守る。
+// 筆跡の中身（点の数や座標）はルールでは検査できないため、送る側と受け取る側の端末で検査する（public/js/validate.js）。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- 共通の関数 ----------
+    // 「全端末ログアウト」より前にログインした端末は、すべての操作を拒否する
+    function authedUser(uid) {
+      let u = get(/databases/$(database)/documents/users/$(uid)).data;
+      return u.get('revokedBefore', null) == null
+        || request.auth.token.auth_time * 1000 >= u.revokedBefore.toMillis();
+    }
+    function authed() { return request.auth != null && authedUser(request.auth.uid); }
+    function validName(n) { return n is string && n.size() >= 1 && n.size() <= 80; }
+    function convPath(cid) { return /databases/$(database)/documents/conversations/$(cid); }
+    function isMember(cid) { return request.auth.uid in get(convPath(cid)).data.members; }
+    function partnerOf(cid) {
+      let m = get(convPath(cid)).data.members;
+      return m[0] == request.auth.uid ? m[1] : m[0];
+    }
+    // どちらの向きでもブロックがあるか（どちらがブロックしたかは相手に分からない）
+    function blockedPair(a, b) {
+      return exists(/databases/$(database)/documents/blocks/$(a + '_' + b))
+          || exists(/databases/$(database)/documents/blocks/$(b + '_' + a));
+    }
+
+    // ---------- ユーザー ----------
+    match /users/{uid} {
+      allow get: if authed();   // 相手の名前を表示するため。一覧（list）は不可
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'notify', 'createdAt', 'revokedBefore'])
+        && validName(request.resource.data.name)
+        && request.resource.data.notify is bool
+        && request.resource.data.createdAt is int
+        && request.resource.data.revokedBefore == null;
+      allow update: if authed() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'notify', 'revokedBefore'])
+        && validName(request.resource.data.name)
+        && request.resource.data.notify is bool
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['revokedBefore'])
+            || request.resource.data.revokedBefore == request.time);
+      allow delete: if authed() && request.auth.uid == uid;
+    }
+
+    // ---------- 招待（コードは推測できない長さ。ドキュメント ID はそのハッシュ） ----------
+    match /invites/{h} {
+      allow get: if true; // 登録前の画面で「○○さんが招待しています」を出すため（コードを知っている人だけが読める）
+      allow list: if authed() && resource.data.inviterId == request.auth.uid;
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['inviterId', 'inviterName', 'createdAt', 'expiresAt', 'usedBy', 'usedAt', 'conversationId'])
+        && request.resource.data.inviterId == request.auth.uid
+        && request.resource.data.inviterName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.name
+        && request.resource.data.usedBy == null
+        && request.resource.data.createdAt is int
+        && request.resource.data.expiresAt is int
+        && request.resource.data.expiresAt > request.time.toMillis()
+        && request.resource.data.expiresAt <= request.time.toMillis() + 864000000; // 最大10日
+      // 受け入れ: 1回だけ・期限内・自分の招待は不可・ブロック関係なら不可
+      allow update: if authed()
+        && resource.data.usedBy == null
+        && resource.data.inviterId != request.auth.uid
+        && resource.data.expiresAt > request.time.toMillis()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy', 'usedAt', 'conversationId'])
+        && request.resource.data.usedBy == request.auth.uid
+        && !blockedPair(request.auth.uid, resource.data.inviterId);
+      allow delete: if authed() && resource.data.inviterId == request.auth.uid;
+    }
+
+    // ---------- トーク（1対1） ----------
+    match /conversations/{cid} {
+      allow get, list: if authed() && request.auth.uid in resource.data.members;
+      // 作れるのは「未使用・期限内の招待を、今まさに受け入れた人」だけ（同じ書き込みの中で招待が使用済みになること）
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['members', 'createdAt', 'msgSeq', 'last', 'inviteHash'])
+        && request.resource.data.members.size() == 2
+        && request.resource.data.members[1] == request.auth.uid
+        && request.resource.data.msgSeq == 0
+        && request.resource.data.last == null
+        && request.resource.data.createdAt is int
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteHash)).data.usedBy == null
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteHash)).data.inviterId == request.resource.data.members[0]
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteHash)).data.expiresAt > request.time.toMillis()
+        && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.inviteHash)).data.usedBy == request.auth.uid;
+      allow update: if authed() && request.auth.uid in resource.data.members && (
+        // 送信: 連番を +1 し、最後のメッセージ情報を更新
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgSeq', 'last'])
+          && request.resource.data.msgSeq == resource.data.msgSeq + 1
+          && request.resource.data.last.keys().hasOnly(['senderId', 'serverTimestamp', 'seq'])
+          && request.resource.data.last.senderId == request.auth.uid
+          && request.resource.data.last.seq == request.resource.data.msgSeq
+          && request.resource.data.last.serverTimestamp == request.time)
+        ||
+        // 退会: 自分だけを members から外す
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+          && request.resource.data.members.size() == resource.data.members.size() - 1
+          && !(request.auth.uid in request.resource.data.members)
+          && request.resource.data.members.hasOnly(resource.data.members))
+      );
+      allow delete: if authed() && resource.data.members == [request.auth.uid];
+
+      match /messages/{mid} {
+        allow get, list: if authed() && isMember(cid);
+        allow create: if authed() && isMember(cid)
+          && request.resource.data.keys().hasOnly(['seq', 'senderId', 'clientMessageId', 'serverTimestamp', 'payloadVersion', 'tokens', 'altText', 'deliveredAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.seq == getAfter(convPath(cid)).data.msgSeq
+          && request.resource.data.serverTimestamp == request.time
+          && request.resource.data.payloadVersion == 1
+          && request.resource.data.clientMessageId is string
+          && request.resource.data.clientMessageId.matches('^[A-Za-z0-9_-]{8,64}$')
+          && request.resource.data.tokens is string
+          && request.resource.data.tokens.size() > 0
+          && request.resource.data.tokens.size() < 700000
+          && (request.resource.data.altText == null
+              || (request.resource.data.altText is string && request.resource.data.altText.size() <= 1000))
+          && request.resource.data.deliveredAt == null
+          && !blockedPair(request.auth.uid, partnerOf(cid));
+        // 受け取った側が「届いた」時刻を1回だけ付けられる
+        allow update: if authed() && isMember(cid)
+          && resource.data.senderId != request.auth.uid
+          && resource.data.deliveredAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredAt'])
+          && request.resource.data.deliveredAt == request.time;
+        // 自分が送ったもの、または最後の1人が退会するとき
+        allow delete: if authed() && (resource.data.senderId == request.auth.uid
+          || (isMember(cid) && get(convPath(cid)).data.members.size() == 1));
+      }
+    }
+
+    // ---------- ブロック（自分が作ったものだけ読める。相手には分からない） ----------
+    match /blocks/{blockId} {
+      allow get: if authed() && blockId.matches(request.auth.uid + '_.*');
+      allow list: if authed() && resource.data.blockerId == request.auth.uid;
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['blockerId', 'blockedId', 'createdAt'])
+        && request.resource.data.blockerId == request.auth.uid
+        && blockId == request.auth.uid + '_' + request.resource.data.blockedId;
+      allow delete: if authed() && resource.data.blockerId == request.auth.uid;
+    }
+
+    // ---------- 通報・集計（書き込み専用。読めるのは Firebase コンソールだけ） ----------
+    match /reports/{id} {
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['reporterId', 'messageId', 'reportedUserId', 'conversationId', 'reason', 'createdAt'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 500
+        && isMember(request.resource.data.conversationId);
+    }
+    match /metrics/{id} {
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['type', 'userId', 'conversationId', 'value', 'createdAt'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.type in ['register', 'invite_created', 'invite_accepted', 'message_sent'];
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}
