@@ -129,10 +129,13 @@ export class Composer {
 
   renderCells() {
     const n = this.N(), base = this.base();
-    const padW = this.cellsEl.parentElement.clientWidth - 2 * 34 - 8;
-    const maxCell = Math.floor(window.innerHeight * (this.zoom ? 0.40 : 0.24));
-    const gap = 8;
-    const size = Math.max(64, Math.min(Math.floor((padW - gap * (n - 1)) / n), maxCell, 260));
+    // 横幅から決まる大きさ: 矢印の実際の幅と、CSS の gap を読んで、空きをむだにしない
+    const pad = this.cellsEl.parentElement;
+    const gap = parseFloat(getComputedStyle(this.cellsEl).columnGap) || 8;
+    const padGap = parseFloat(getComputedStyle(pad).columnGap) || 4;
+    const padW = pad.clientWidth - (this.prevBtn.offsetWidth || 30) - (this.nextBtn.offsetWidth || 30) - 2 * padGap;
+    const maxCell = Math.floor(window.innerHeight * (this.zoom ? 0.46 : 0.31)); // 縦の上限（以前は 0.40 / 0.24）
+    const size = Math.max(64, Math.min(Math.floor((padW - gap * (n - 1)) / n), maxCell, 340)); // 以前は最大 260
     const key = [n, base, size].join(':');
     if (key !== this.layoutKey) {
       this.layoutKey = key;

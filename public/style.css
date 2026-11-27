@@ -214,3 +214,9 @@ small { font-size: 11px; color: var(--sub); }
   flex: 1 1 auto;
 }
 #st-hand button { padding-left: 1rem; padding-right: 1rem; min-width: 6.5rem; }
+
+/* style.css の最後に足す。スマホで3マスのとき、マスを大きくするために余白を詰める */
+.composer { padding-left: 6px; padding-right: 6px; }
+.pad { gap: 3px; }
+.pg { width: 24px; min-width: 24px; font-size: 20px; }
+.cells { gap: 6px; }
