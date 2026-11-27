@@ -136,7 +136,7 @@ export class Composer {
     const wrapped = getComputedStyle(pad).flexWrap === 'wrap'; // 矢印がマスの下の行にあるとき
     const padW = wrapped ? pad.clientWidth : pad.clientWidth - (this.prevBtn.offsetWidth || 30) - (this.nextBtn.offsetWidth || 30) - 2 * padGap;
     const maxCell = Math.floor(window.innerHeight * (this.zoom ? 0.46 : 0.31)); // 縦の上限（以前は 0.40 / 0.24）
-    const size = Math.max(64, Math.min(Math.floor((padW - gap * (n - 1)) / n), maxCell, 340)); // 以前は最大 260
+    const size = Math.max(64, Math.min(Math.floor((padW - gap * (n - 1)) / n), maxCell, this.zoom ? 480 : 340)); // 通常は最大 340px（以前は 260）。⤢ のときは横幅いっぱいまで
     const key = [n, base, size].join(':');
     if (key !== this.layoutKey) {
       this.layoutKey = key;
