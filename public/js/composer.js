@@ -69,8 +69,13 @@ export class Composer {
     this.cands = h('div', { class: 'cands', role: 'group', 'aria-label': 'お手本の候補（押しても本文には入りません）' });
     this.searchBtn = h('button', { class: 'icon', type: 'button', 'aria-label': 'お手本を読みで探す', 'aria-expanded': 'false', onclick: () => this.toggleSearch() }, '🔍');
     this.guideToggle = h('button', { class: 'chip', type: 'button', 'aria-pressed': 'true', title: 'お手本の表示を切り替え', onclick: () => this.toggleGuideVisible() }, '見本');
-    this.cellsBtn = h('button', { class: 'chip', type: 'button', title: '1行のマスの数を 2 と 3 で切り替え', onclick: () => this.cycleCells() }, '3マス');
-    const bar = h('div', { class: 'guidebar' }, this.readout, this.cands, this.searchBtn, this.cellsBtn, this.guideToggle);
+    this.cellBtns = {};
+    this.cellsSeg = h('div', { class: 'seg cellseg', role: 'radiogroup', 'aria-label': '1行のマスの数' }, h('span', { class: 'cellseg-label', text: 'マス' }));
+    for (const v of [2, 3]) {
+      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': 'false', 'aria-label': `${v}マス`, onclick: () => this.setCells(v) }, String(v));
+      this.cellBtns[v] = b; this.cellsSeg.append(b);
+    }
+    const bar = h('div', { class: 'guidebar' }, this.readout, this.cands, this.searchBtn, this.cellsSeg, this.guideToggle);
     this.searchInput = h('input', { type: 'search', class: 'search', placeholder: 'お手本を読みで探す（例：きもち）', 'aria-label': 'お手本を読みで探す', enterkeyhint: 'search' });
     this.searchInput.addEventListener('input', () => { this.query = this.searchInput.value; this.updateCandidates(); });
     this.searchRow = h('div', { class: 'searchrow', hidden: '' }, this.searchInput);
@@ -214,7 +219,8 @@ export class Composer {
     this.sendBtn.disabled = locked || !this.tokens.some(hasInk);
     this.guideToggle.setAttribute('aria-pressed', String(!!this.settings().guideVisible));
     this.guideToggle.textContent = this.settings().guideVisible ? '見本 ON' : '見本 OFF';
-    this.cellsBtn.textContent = `${Number(this.settings().cells) || 3}マス`;
+    const cur = Number(this.settings().cells) || 3;
+    for (const [v, b] of Object.entries(this.cellBtns)) { const on = Number(v) === cur; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); }
   }
 
   say(text, action) {
@@ -363,10 +369,11 @@ export class Composer {
     if (!this.searchRow.hidden) this.searchInput.focus();
     else { this.query = ''; this.searchInput.value = ''; this.updateCandidates(); }
   }
-  cycleCells() {
-    if (this.drawing) return;
+  setCells(v) {
+    if (this.drawing) return; // 書いている最中は動かさない（マスが動くと線がずれる）
     const s = this.settings();
-    s.cells = Number(s.cells) === 2 ? 3 : 2; // 4 は設定画面から。ここでは 2 と 3 を行き来する
+    if (Number(s.cells) === v) return;
+    s.cells = v;
     this.onSettings?.(s);
     this.relayout();
   }
