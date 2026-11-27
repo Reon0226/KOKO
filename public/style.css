@@ -215,8 +215,9 @@ small { font-size: 11px; color: var(--sub); }
 }
 #st-hand button { padding-left: 1rem; padding-right: 1rem; min-width: 6.5rem; }
 
-/* style.css の最後に足す。スマホで3マスのとき、マスを大きくするために余白を詰める */
+/* style.css の最後に足す（前に足した style-bigcells.css の4行は消して、これに置き換える）。
+   矢印（‹ ›）をマスの下の行に移して、マスの横幅を最大限に使う */
 .composer { padding-left: 6px; padding-right: 6px; }
-.pad { gap: 3px; }
-.pg { width: 24px; min-width: 24px; font-size: 20px; }
-.cells { gap: 6px; }
+.pad { flex-wrap: wrap; gap: 6px; }
+.cells { order: 0; flex: 0 0 100%; gap: 6px; }
+.pg { order: 1; flex: 1 1 0; width: auto; min-width: 0; align-self: auto; height: 38px; min-height: 38px; font-size: 22px; }

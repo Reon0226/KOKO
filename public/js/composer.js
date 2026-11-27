@@ -118,7 +118,7 @@ export class Composer {
 
   renderDraft() {
     if (!this.tokens.length) {
-      this.draftEl.replaceChildren(h('span', { class: 'ph', text: 'マスに一文字ずつ、きみの字で。' }));
+      this.draftEl.replaceChildren(); // 空のときも欄は残す（消すと書き始めにマスが動いて、線の位置がずれる）
       return;
     }
     renderFlow(this.draftEl, this.tokens, { cursor: this.cursor, onTap: i => { if (!this.drawing) { this.cursor = i; if (this.collapsed) this.setCollapsed(false); this.render(); } } });
@@ -133,7 +133,8 @@ export class Composer {
     const pad = this.cellsEl.parentElement;
     const gap = parseFloat(getComputedStyle(this.cellsEl).columnGap) || 8;
     const padGap = parseFloat(getComputedStyle(pad).columnGap) || 4;
-    const padW = pad.clientWidth - (this.prevBtn.offsetWidth || 30) - (this.nextBtn.offsetWidth || 30) - 2 * padGap;
+    const wrapped = getComputedStyle(pad).flexWrap === 'wrap'; // 矢印がマスの下の行にあるとき
+    const padW = wrapped ? pad.clientWidth : pad.clientWidth - (this.prevBtn.offsetWidth || 30) - (this.nextBtn.offsetWidth || 30) - 2 * padGap;
     const maxCell = Math.floor(window.innerHeight * (this.zoom ? 0.46 : 0.31)); // 縦の上限（以前は 0.40 / 0.24）
     const size = Math.max(64, Math.min(Math.floor((padW - gap * (n - 1)) / n), maxCell, 340)); // 以前は最大 260
     const key = [n, base, size].join(':');
